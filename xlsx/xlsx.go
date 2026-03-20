@@ -14,7 +14,12 @@
 
 package xlsx
 
-import "github.com/tealeg/xlsx"
+import (
+	"bytes"
+	"os"
+
+	"github.com/tealeg/xlsx"
+)
 
 func ReadXlsxFile(path string) [][]string {
 	file, err := xlsx.OpenFile(path)
@@ -36,4 +41,67 @@ func ReadXlsxFile(path string) [][]string {
 	}
 
 	return res
+}
+
+// ReadXlsxFileBytes reads xlsx file from bytes
+func ReadXlsxFileBytes(data []byte) ([][]string, error) {
+	// Create temp file
+	tmpFile, err := os.CreateTemp("", "*.xlsx")
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(tmpFile.Name())
+
+	// Write data
+	_, err = tmpFile.Write(data)
+	if err != nil {
+		return nil, err
+	}
+	tmpFile.Close()
+
+	// Read file
+	file, err := xlsx.OpenFile(tmpFile.Name())
+	if err != nil {
+		return nil, err
+	}
+
+	res := [][]string{}
+	for _, sheet := range file.Sheets {
+		for _, row := range sheet.Rows {
+			line := []string{}
+			for _, cell := range row.Cells {
+				text := cell.String()
+				line = append(line, text)
+			}
+			res = append(res, line)
+		}
+		break
+	}
+
+	return res, nil
+}
+
+// WriteXlsxFileBytes writes data to xlsx format bytes
+func WriteXlsxFileBytes(data [][]string) ([]byte, error) {
+	file := xlsx.NewFile()
+	sheet, err := file.AddSheet("Sheet1")
+	if err != nil {
+		return nil, err
+	}
+
+	for _, rowData := range data {
+		row := sheet.AddRow()
+		for _, cellData := range rowData {
+			cell := row.AddCell()
+			cell.Value = cellData
+		}
+	}
+
+	var buf bytes.Buffer
+	err = file.Write(&buf)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
 }
